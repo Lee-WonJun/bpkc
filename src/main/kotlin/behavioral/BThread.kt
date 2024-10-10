@@ -14,8 +14,8 @@ class RegisteredBThread(
     val priority: Double,
     val syncChannel: Channel<SyncPoint>
 ) {
-    val eventChannel = Channel<String>(Channel.UNLIMITED)
-    var lastEvent: String = ""
+    val eventChannel = Channel<Event>(Channel.UNLIMITED)
+    lateinit var lastEvent: Event
 
 
     suspend fun sync(

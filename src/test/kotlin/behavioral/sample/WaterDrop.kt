@@ -7,6 +7,8 @@ import behavioral.bProgram
 import behavioral.bThread
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.core.tuple
+import io.kotest.matchers.equals.shouldBeEqual
+import io.kotest.matchers.should
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,7 +20,6 @@ enum class WaterEvent : Event {
 
 
 class WaterDrop : FunSpec({
-
     test("WaterDrop") {
         // Define the Hot Water BThread
         val hotWater = bThread(name = "Hot Water") {
@@ -42,6 +43,7 @@ class WaterDrop : FunSpec({
             }
         }
 
+
         // Define the Display BThread
         val display = bThread(name = "Display") {
             while(true) {
@@ -50,14 +52,31 @@ class WaterDrop : FunSpec({
             }
         }
 
+
+        val assert = bThread(name = "Assert") {
+            val hot_cold_loop = sequence {
+                while(true) {
+                    yield(WaterEvent.ADD_HOT)
+                    yield(WaterEvent.ADD_COLD)
+                }
+            }
+
+            for (i in hot_cold_loop) {
+                sync(request = All)
+                lastEvent shouldBeEqual i
+            }
+        }
+
         // Create the BProgram with all BThreads
         val program = bProgram(
             hotWater,
-            display,
             coldWater,
-            interleave
+            interleave,
+            display,
+            assert
         )
 
+        program.debugMode()
         program.startAll()
 
     }

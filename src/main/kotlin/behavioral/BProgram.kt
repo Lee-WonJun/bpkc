@@ -1,6 +1,7 @@
 package behavioral
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -13,10 +14,20 @@ class CompletionException : CancellationException("Behavior completed")
 
 class BProgram {
     private val bThreads = mutableListOf<RegisteredBThread>()
+    private val jobToBThread = mutableMapOf<Job, RegisteredBThread>()
     private val syncPoints = mutableMapOf<RegisteredBThread, SyncPoint>()
     private val syncChannel = Channel<SyncPoint>(Channel.UNLIMITED)
 
     private var busyCount = AtomicInteger(0)
+
+    private var debugMode = false
+    fun debugMode() {
+        debugMode = true
+    }
+
+    val debugPrint : (String) -> Unit by lazy {
+        if (debugMode) ::println else { _ -> }
+    }
 
 
     fun add(bThread: BThread, priority: Double) {
@@ -30,30 +41,38 @@ class BProgram {
                 start()
             }
         } catch (e: CompletionException) {
-            println("Program completed")
+            debugPrint("Program completed")
         }
     }
 
+
     val start: suspend CoroutineScope.() -> Unit = {
         val jobs = bThreads.map { bThread ->
-            launch {
+            val job = launch {
                 bThread.start()
             }
+            jobToBThread[job] = bThread
+            job
         }
 
-        jobs.forEach {
-            it.invokeOnCompletion {
-                cancel(CompletionException())
+        jobs.forEach { job->
+            job.invokeOnCompletion {
+                val bThread = jobToBThread[job]!!
+                syncPoints.remove(bThread)
+                val x =  busyCount.addAndGet(-1)
+                debugPrint("thread closed busyCount: $x")
             }
         }
 
 
 
         busyCount.addAndGet(bThreads.size)
-        while (true) {
+        while (busyCount.get() > 0) {
             val message = syncChannel.receive()
             syncPoints[message.sender] = message
-            busyCount.addAndGet(-1)
+
+            val x= busyCount.addAndGet(-1)
+            debugPrint("sync received busyCount: $x")
 
             if (busyCount.get() == 0) {
                 val allRequests = syncPoints.values.flatMap { it.request }.toSet()
@@ -81,11 +100,15 @@ class BProgram {
                 }
 
                 toNotify.toSortedMap(compareBy { it.priority }).forEach { (bThread, syncPoint) ->
-                    bThread.eventChannel.send(selectedEvent.toString())
-                    busyCount.addAndGet(1)
+                    if (selectedEvent != null) {
+                        busyCount.addAndGet(1)
+                        bThread.eventChannel.send(selectedEvent)
+                    }
                 }
             }
         }
+
+        cancel(CompletionException())
     }
 
 }
