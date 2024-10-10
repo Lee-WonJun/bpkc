@@ -12,7 +12,7 @@ class RegisteredBThread(
     val name: String,
     val behavior: suspend RegisteredBThread.() -> Unit,
     val priority: Double,
-    val syncChannel: Channel<SyncPoint>
+    private val syncChannel: Channel<SyncPoint>
 ) {
     val eventChannel = Channel<Event>(Channel.UNLIMITED)
     lateinit var lastEvent: Event

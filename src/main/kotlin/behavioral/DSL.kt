@@ -6,7 +6,7 @@ fun bThread(name: String, block: suspend RegisteredBThread.() -> Unit) = BThread
 fun bProgram(vararg bThread: BThread): BProgram {
     val program = BProgram()
     bThread.forEachIndexed { index, it ->
-        program.add(it, index.toDouble())
+        program.registerBThread(it, index.toDouble())
     }
     return program
 }

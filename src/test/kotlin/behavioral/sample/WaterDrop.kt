@@ -6,12 +6,7 @@ import behavioral.None
 import behavioral.bProgram
 import behavioral.bThread
 import io.kotest.core.spec.style.FunSpec
-import io.kotest.core.tuple
 import io.kotest.matchers.equals.shouldBeEqual
-import io.kotest.matchers.should
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
-import java.util.concurrent.atomic.AtomicInteger
 
 
 enum class WaterEvent : Event {
@@ -76,8 +71,8 @@ class WaterDrop : FunSpec({
             assert
         )
 
-        program.debugMode()
-        program.startAll()
+        program.enableDebug()
+        program.runAllBThreads()
 
     }
 })
