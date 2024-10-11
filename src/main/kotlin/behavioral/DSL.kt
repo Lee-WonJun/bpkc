@@ -5,7 +5,7 @@ fun bThread(name: String, block: suspend RegisteredBThread.() -> Unit) = BThread
 
 fun bProgram(vararg bThread: BThread): BProgram {
     val program = BProgram()
-    bThread.forEachIndexed { index, it ->
+    bThread.reversed().forEachIndexed { index, it ->
         program.registerBThread(it, index.toDouble())
     }
     return program

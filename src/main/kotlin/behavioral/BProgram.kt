@@ -70,7 +70,7 @@ class BProgram {
         activeThreads.decrementAndGet().also { debugLog("activeThreads: $it") }
 
         if (needsSync) {
-            val nextEvent = selectNextEvent()
+            val nextEvent = selectNextEvent() ?: return
 
             val threadsToNotify = determineThreadsToNotify(nextEvent)
 
@@ -85,6 +85,7 @@ class BProgram {
         threadsToNotify.toSortedMap(compareBy { it.priority }).forEach { (bThread, _) ->
             nextEvent?.let {
                 activeThreads.incrementAndGet()
+                debugLog("[Notify ${bThread.name}] to send $it")
                 bThread.eventChannel.send(it)
             }
         }
@@ -101,18 +102,14 @@ class BProgram {
         val blockedEvents = syncPoints.values.flatMap { it.block }.toSet()
         val availableEvents = requestedEvents - blockedEvents
 
-        val eventPriorities = mutableMapOf<Event, Double>()
-        for (event in availableEvents) {
-            val priorities = syncPoints.filter { (_, syncPoint) ->
-                event in syncPoint.request || event in syncPoint.waitFor
+        return availableEvents.maxByOrNull {
+            val p = syncPoints.filter { (_, syncPoint) ->
+                it in syncPoint.request || it in syncPoint.waitFor
             }.mapNotNull { (bThread, _) ->
-                bThreads.find { it.name == bThread.name }?.priority
+                bThread.priority
             }
-            if (priorities.isNotEmpty()) {
-                eventPriorities[event] = priorities.maxOrNull() ?: 0.0
-            }
+            p.maxOrNull() ?: 0.0
         }
-        return eventPriorities.minByOrNull { it.value }?.key
     }
 
     private fun CoroutineScope.initializeBThreads() {
@@ -127,7 +124,7 @@ class BProgram {
 
                     context?.bThread?.let { removedThread ->
                         syncPoints.remove(removedThread)
-                        activeThreads.decrementAndGet()
+                        val active = activeThreads.decrementAndGet()
                             .also { debugLog("[Job Completed ${removedThread.name}] activeThreads: $it") }
                     }
                 }
