@@ -12,7 +12,7 @@ class RegisteredBThread(
     val name: String,
     val behavior: suspend RegisteredBThread.() -> Unit,
     val priority: Double,
-    private val syncChannel: Channel<SyncPoint>
+    private val syncChannel: Channel<SyncChannelMessage>
 ) {
     val eventChannel = Channel<Event>(Channel.UNLIMITED)
     lateinit var lastEvent: Event
@@ -23,7 +23,7 @@ class RegisteredBThread(
         waitFor: Set<Event> = None,
         blockEvent: Set<Event> = None
     ) {
-        val syncPoint = SyncPoint(
+        val syncPoint = SyncChannelMessage.SyncPoint(
             this,
             request,
             waitFor,
@@ -38,5 +38,10 @@ class RegisteredBThread(
 
     suspend fun start() {
         behavior()
+        terminate()
+    }
+
+    suspend fun terminate() {
+        syncChannel.send(SyncChannelMessage.Terminate(this))
     }
 }

@@ -3,6 +3,7 @@ package behavioral
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
@@ -18,8 +19,8 @@ class BCompletionException : CancellationException("Behavior completed")
 
 class BProgram {
     private val bThreads = mutableListOf<RegisteredBThread>()
-    private val syncPoints = ConcurrentHashMap<RegisteredBThread, SyncPoint>()
-    private val syncChannel = Channel<SyncPoint>(Channel.UNLIMITED)
+    private val syncPoints = ConcurrentHashMap<RegisteredBThread, SyncChannelMessage.SyncPoint>()
+    private val syncChannel = Channel<SyncChannelMessage>(Channel.UNLIMITED)
     private val activeThreads = AtomicInteger(0)
 
     private var debugEnabled = false
@@ -65,21 +66,32 @@ class BProgram {
     private val needsSync get() = activeThreads.get() == 0
 
     private suspend fun handleSyncPoint() {
-        val syncPoint = syncChannel.receive()
-        syncPoints[syncPoint.sender] = syncPoint
-        activeThreads.decrementAndGet().also { debugLog("activeThreads: $it") }
+        when (val syncPoint = syncChannel.receive()) {
+            is SyncChannelMessage.SyncPoint -> {
+                syncPoints[syncPoint.sender] = syncPoint
+                activeThreads.decrementAndGet().also { debugLog("activeThreads: $it") }
 
-        if (needsSync) {
-            val nextEvent = selectNextEvent() ?: return
+                if (needsSync) {
+                    val nextEvent = selectNextEvent()
 
-            val threadsToNotify = determineThreadsToNotify(nextEvent)
+                    val threadsToNotify = determineThreadsToNotify(nextEvent)
 
-            notifyBThreads(threadsToNotify, nextEvent)
+                    debugLog("Next event: $nextEvent")
+                    debugLog("Threads to notify: ${threadsToNotify.keys.joinToString { it.name }}")
+                    notifyBThreads(threadsToNotify, nextEvent)
+                }
+            }
+            is SyncChannelMessage.Terminate -> {
+                syncPoints.remove(syncPoint.sender)
+                activeThreads.decrementAndGet().also {
+                    debugLog("terminated ${syncPoint.sender.name}")
+                }
+            }
         }
     }
 
     private suspend fun notifyBThreads(
-        threadsToNotify: Map<RegisteredBThread, SyncPoint>,
+        threadsToNotify: Map<RegisteredBThread, SyncChannelMessage.SyncPoint>,
         nextEvent: Event?
     ) {
         threadsToNotify.toSortedMap(compareBy { it.priority }).forEach { (bThread, _) ->
@@ -91,7 +103,7 @@ class BProgram {
         }
     }
 
-    private fun determineThreadsToNotify(nextEvent: Event?): Map<RegisteredBThread, SyncPoint> {
+    private fun determineThreadsToNotify(nextEvent: Event?): Map<RegisteredBThread, SyncChannelMessage.SyncPoint> {
         return syncPoints.filter { (_, syncPoint) ->
             nextEvent in syncPoint.request || nextEvent in syncPoint.waitFor
         }
@@ -114,20 +126,9 @@ class BProgram {
 
     private fun CoroutineScope.initializeBThreads() {
         activeThreads.set(bThreads.size)
-
         bThreads.forEach { bThread ->
             launch(BThreadContext(bThread)) {
                 bThread.start()
-            }.also { job ->
-                job.invokeOnCompletion {
-                    val context = (job as? CoroutineScope)?.coroutineContext?.get(BThreadContextKey)
-
-                    context?.bThread?.let { removedThread ->
-                        syncPoints.remove(removedThread)
-                        val active = activeThreads.decrementAndGet()
-                            .also { debugLog("[Job Completed ${removedThread.name}] activeThreads: $it") }
-                    }
-                }
             }
         }
     }
