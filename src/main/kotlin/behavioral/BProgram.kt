@@ -94,12 +94,14 @@ class BProgram {
         threadsToNotify: Map<RegisteredBThread, SyncChannelMessage.SyncPoint>,
         nextEvent: Event?
     ) {
-        threadsToNotify.toSortedMap(compareBy { it.priority }).forEach { (bThread, _) ->
-            nextEvent?.let {
-                activeThreads.incrementAndGet()
-                debugLog("[Notify ${bThread.name}] to send $it")
-                bThread.eventChannel.send(it)
-            }
+        nextEvent?.let { event ->
+            threadsToNotify.toSortedMap(compareBy { -it.priority })
+                .also { bThreads -> debugLog("Sorted threads: ${bThreads.keys.joinToString { it.name + it.priority.toString() }}") }
+                .forEach { (bThread, _) ->
+                    activeThreads.incrementAndGet()
+                    debugLog("[Notify ${bThread.name}] to send $event")
+                    bThread.eventChannel.send(event)
+                }
         }
     }
 
