@@ -33,7 +33,6 @@ class RegisteredBThread(
         // Wait for the event to be sent back
         val event = eventChannel.receive()
         lastEvent = event
-        yield()
     }
 
     suspend fun start() {
