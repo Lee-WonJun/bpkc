@@ -92,5 +92,7 @@ In this example, the `Hot Water` and `Cold Water` behaviors alternate execution 
 - [Introduction to Behavioral Programming Video](https://www.youtube.com/watch?v=1oKzTrq0gMM)
 - [Behavioral Programming in Clojure](https://thomascothran.tech/2024/09/in-clojure/)
 - [Crash Course on Behavioral Programming](https://medium.com/@eugenesh4work/crash-course-behavioral-programming-in-clojure-with-core-async-07ed06ddd760)
+- [Behavioral Programming written in Kotlin and optimized for Android](https://github.com/EricDw/BPK-4-DROID)
+- [Behavioral Programming for JavaScript](https://github.com/lmatteis/behavioral)
 
 BPKC is a useful tool for modeling asynchronous tasks and complex behavior interactions. However, as it is primarily designed for educational purposes, it lacks dynamic behavior management and needs more testing for advanced scenarios.
